@@ -3,9 +3,11 @@ mod modules;
 mod state;
 
 use axum::Router;
+use tokio::sync::broadcast;
 use tower_http::trace::TraceLayer;
 use tracepilot_core::Config;
 
+use crate::modules::monitor::TraceEvent;
 use crate::state::AppState;
 
 #[tokio::main]
@@ -28,11 +30,52 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     sqlx::migrate!("../../migrations").run(&pool).await?;
     tracing::info!("migrations applied");
 
-    let storage = modules::storage::Storage::new(pool);
+    let storage = modules::storage::Storage::new(pool.clone());
+
+    // 监控广播通道：后台轮询任务写入，WebSocket 客户端订阅。
+    let (monitor_tx, _monitor_rx) = broadcast::channel::<TraceEvent>(256);
+
     let state = AppState {
         config: config.clone(),
-        storage,
+        storage: storage.clone(),
+        monitor_tx,
     };
+
+    // 启动后台轮询：每 5 秒扫一次新 trace，广播给 WebSocket 客户端。
+    {
+        let storage = storage.clone();
+        let monitor_tx = state.monitor_tx.clone();
+        let pool = pool.clone();
+        tokio::spawn(async move {
+            let mut last_seen = chrono::Utc::now();
+            loop {
+                // 列出所有 project_id，逐个扫描新 trace。
+                let projects: Vec<String> =
+                    sqlx::query_scalar("SELECT id FROM projects ORDER BY created_at")
+                        .fetch_all(&pool)
+                        .await
+                        .unwrap_or_default();
+
+                for project_id in projects {
+                    if let Ok(traces) = storage.list_traces_since(&project_id, last_seen, 200).await
+                    {
+                        for t in traces {
+                            let _ = monitor_tx.send(TraceEvent {
+                                trace_id: t.id,
+                                project_id: t.project_id,
+                                agent_id: t.agent_id,
+                                status: t.status,
+                                started_at: t.started_at,
+                                duration_ms: t.duration_ms,
+                            });
+                        }
+                    }
+                }
+                last_seen = chrono::Utc::now();
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            }
+        });
+    }
 
     let mut app: Router<AppState> = Router::new();
     app = app.route("/api/health", axum::routing::get(|| async { "ok" }));

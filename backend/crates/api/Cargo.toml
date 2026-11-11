@@ -6,9 +6,9 @@ license.workspace = true
 
 [dependencies]
 tracepilot-core = { path = "../core" }
-axum = "0.7"
+axum = { version = "0.7", features = ["ws"] }
 tokio = { version = "1", features = ["full"] }
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "uuid", "json", "migrate", "macros"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "uuid", "json", "migrate", "macros", "chrono"] }
 tokio-postgres = "0.7"
 serde = { workspace = true }
 serde_json = { workspace = true }

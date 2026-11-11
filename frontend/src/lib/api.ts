@@ -40,7 +40,24 @@ export const api = {
   listTraces: (projectId: string, limit = 50) =>
     request<Trace[]>(`/api/query/traces?project_id=${projectId}&limit=${limit}`),
   getTrace: (traceId: string) => request<TraceDetail>(`/api/query/traces/${traceId}`),
+
+  monitorStats: (projectId: string) =>
+    request<MonitorStats>(`/api/monitor/stats?project_id=${projectId}`),
+  monitorAgents: (projectId: string) =>
+    request<AgentStats[]>(`/api/monitor/agents?project_id=${projectId}`),
+  analyticsSummary: (projectId: string) =>
+    request<AnalyticsSummary>(`/api/analytics/summary?project_id=${projectId}`),
+  analyticsLatency: (projectId: string) =>
+    request<LatencyPoint[]>(`/api/analytics/latency?project_id=${projectId}`),
+  analyticsCost: (projectId: string) =>
+    request<CostBreakdown[]>(`/api/analytics/cost?project_id=${projectId}`),
 };
+
+/// WebSocket 基址：http(s):// 换成 ws(s)://（浏览器 WS 无法带自定义 header，
+/// api_key 走 query 由后端校验）。
+export function wsBase(): string {
+  return BASE.replace(/^http/, "ws");
+}
 
 export interface Trace {
   id: string;
@@ -66,4 +83,63 @@ export interface Span {
 export interface TraceDetail {
   trace: Trace;
   spans: Span[];
+}
+
+export interface MonitorStats {
+  total: number;
+  success: number;
+  error: number;
+  avg_ms: number | null;
+  p50_ms: number | null;
+  p95_ms: number | null;
+}
+
+export interface AgentStats {
+  agent: string;
+  total: number;
+  success: number;
+  avg_ms: number | null;
+  p95_ms: number | null;
+}
+
+export interface SpanKindStat {
+  kind: string;
+  total: number;
+  success: number;
+  avg_ms: number | null;
+}
+
+export interface AnalyticsSummary {
+  total: number;
+  success: number;
+  success_rate: number;
+  avg_ms: number | null;
+  p50_ms: number | null;
+  p95_ms: number | null;
+  p99_ms: number | null;
+  span_kinds: SpanKindStat[];
+}
+
+export interface LatencyPoint {
+  bucket: string;
+  total: number;
+  avg_ms: number | null;
+  p95_ms: number | null;
+  success: number;
+}
+
+export interface CostBreakdown {
+  kind: string;
+  total: number;
+  total_ms: number;
+  avg_ms: number | null;
+}
+
+export interface TraceEvent {
+  trace_id: string;
+  project_id: string;
+  agent_id: string | null;
+  status: string;
+  started_at: string;
+  duration_ms: number;
 }

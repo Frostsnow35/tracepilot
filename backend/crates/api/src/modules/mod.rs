@@ -1,8 +1,10 @@
 // 模块注册表：新增模块在此登记一行即被 main 挂载，核心不改。
 // 依赖顺序：iam 为根，storage 次之，ingest/query 依赖 storage。
 
+pub mod analytics;
 pub mod iam;
 pub mod ingest;
+pub mod monitor;
 pub mod query;
 pub mod storage;
 
@@ -28,6 +30,8 @@ pub fn registry() -> Vec<Arc<dyn Module>> {
         Arc::new(storage::StorageModule),
         Arc::new(ingest::IngestModule),
         Arc::new(query::QueryModule),
+        Arc::new(monitor::MonitorModule),
+        Arc::new(analytics::AnalyticsModule),
     ];
     topo_sort(modules)
 }
