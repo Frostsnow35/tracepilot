@@ -77,6 +77,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    // 启动后台告警评估：每 30 秒扫一次启用的规则，超阈值记事件（带冷却）。
+    {
+        let storage = storage.clone();
+        let pool = pool.clone();
+        tokio::spawn(async move {
+            loop {
+                let projects: Vec<String> =
+                    sqlx::query_scalar("SELECT id FROM projects ORDER BY created_at")
+                        .fetch_all(&pool)
+                        .await
+                        .unwrap_or_default();
+
+                for project_id in projects {
+                    if let Err(e) = storage
+                        .evaluate_alerts(
+                            &project_id,
+                            chrono::Utc::now(),
+                            chrono::Duration::minutes(10),
+                        )
+                        .await
+                    {
+                        tracing::warn!(project_id = %project_id, error = %e, "alert evaluation failed");
+                    }
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            }
+        });
+    }
+
     let mut app: Router<AppState> = Router::new();
     app = app.route("/api/health", axum::routing::get(|| async { "ok" }));
     for module in modules::registry() {

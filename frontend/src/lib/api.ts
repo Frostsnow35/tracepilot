@@ -51,6 +51,33 @@ export const api = {
     request<LatencyPoint[]>(`/api/analytics/latency?project_id=${projectId}`),
   analyticsCost: (projectId: string) =>
     request<CostBreakdown[]>(`/api/analytics/cost?project_id=${projectId}`),
+
+  recoveryStats: (projectId: string) =>
+    request<RecoveryStats>(`/api/recovery/stats?project_id=${projectId}`),
+  recoveryAgents: (projectId: string) =>
+    request<RecoveryAgentStats[]>(`/api/recovery/agents?project_id=${projectId}`),
+  recoveryTraces: (projectId: string, limit = 50) =>
+    request<Trace[]>(`/api/recovery/traces?project_id=${projectId}&limit=${limit}`),
+
+  alertRules: (projectId: string) =>
+    request<AlertRule[]>(`/api/alert/rules?project_id=${projectId}`),
+  createAlertRule: (body: {
+    project_id: string;
+    metric: string;
+    operator: string;
+    threshold: number;
+  }) =>
+    request<AlertRule>("/api/alert/rules", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  deleteAlertRule: (projectId: string, ruleId: string) =>
+    request<{ deleted: boolean }>(
+      `/api/alert/rules/${ruleId}?project_id=${projectId}`,
+      { method: "DELETE" },
+    ),
+  alertEvents: (projectId: string, limit = 50) =>
+    request<AlertEvent[]>(`/api/alert/events?project_id=${projectId}&limit=${limit}`),
 };
 
 /// WebSocket 基址：http(s):// 换成 ws(s)://（浏览器 WS 无法带自定义 header，
@@ -142,4 +169,41 @@ export interface TraceEvent {
   status: string;
   started_at: string;
   duration_ms: number;
+}
+
+export interface RecoveryStats {
+  total_spans: number;
+  error_spans: number;
+  retry_spans: number;
+  recovered_traces: number;
+  failed_traces: number;
+  total_traces: number;
+}
+
+export interface RecoveryAgentStats {
+  agent: string;
+  error_spans: number;
+  retry_spans: number;
+  failed_traces: number;
+  total_traces: number;
+}
+
+export interface AlertRule {
+  id: string;
+  project_id?: string;
+  metric: string;
+  operator: string;
+  threshold: number;
+  enabled: boolean;
+  last_triggered_at: string | null;
+}
+
+export interface AlertEvent {
+  id: string;
+  rule_id: string;
+  metric: string;
+  value: number;
+  threshold: number;
+  operator: string;
+  triggered_at: string;
 }

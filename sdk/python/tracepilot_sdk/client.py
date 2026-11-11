@@ -116,3 +116,80 @@ class TracePilotClient:
         )
         r.raise_for_status()
         return r.json()
+
+    def recovery_stats(self, project_id: str) -> dict:
+        """FR-6：恢复观测汇总（失败/重试 span、恢复/失败 trace）。"""
+        r = httpx.get(
+            f"{self.base_url}/api/recovery/stats",
+            params={"project_id": project_id},
+            headers=self._auth(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def recovery_agents(self, project_id: str) -> list[dict]:
+        """FR-6：按 agent 聚合恢复观测。"""
+        r = httpx.get(
+            f"{self.base_url}/api/recovery/agents",
+            params={"project_id": project_id},
+            headers=self._auth(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def recovery_traces(self, project_id: str, limit: int = 50) -> list[dict]:
+        """FR-6：含失败/重试的 trace 列表。"""
+        r = httpx.get(
+            f"{self.base_url}/api/recovery/traces",
+            params={"project_id": project_id, "limit": limit},
+            headers=self._auth(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def alert_rules(self, project_id: str) -> list[dict]:
+        """FR-8：列出告警规则。"""
+        r = httpx.get(
+            f"{self.base_url}/api/alert/rules",
+            params={"project_id": project_id},
+            headers=self._auth(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def create_alert_rule(
+        self, project_id: str, metric: str, operator: str, threshold: float
+    ) -> dict:
+        """FR-8：创建告警规则（metric ∈ error_rate/p95_ms/avg_ms，operator ∈ </>）。"""
+        r = httpx.post(
+            f"{self.base_url}/api/alert/rules",
+            json={
+                "project_id": project_id,
+                "metric": metric,
+                "operator": operator,
+                "threshold": threshold,
+            },
+            headers=self._auth(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def delete_alert_rule(self, project_id: str, rule_id: str) -> dict:
+        """FR-8：删除告警规则。"""
+        r = httpx.delete(
+            f"{self.base_url}/api/alert/rules/{rule_id}",
+            params={"project_id": project_id},
+            headers=self._auth(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def alert_events(self, project_id: str, limit: int = 50) -> list[dict]:
+        """FR-8：列出告警触发事件。"""
+        r = httpx.get(
+            f"{self.base_url}/api/alert/events",
+            params={"project_id": project_id, "limit": limit},
+            headers=self._auth(),
+        )
+        r.raise_for_status()
+        return r.json()

@@ -26,6 +26,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/analytics" className="text-blue-600 hover:underline">
                 分析
               </Link>
+              <Link href="/recovery" className="text-blue-600 hover:underline">
+                恢复
+              </Link>
+              <Link href="/alerts" className="text-blue-600 hover:underline">
+                告警
+              </Link>
             </div>
           </div>
         </nav>
