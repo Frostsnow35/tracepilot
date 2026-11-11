@@ -1,78 +1,94 @@
 # TracePilot
 
-我们正在做一个 Agent 运行时可观测平台 —— 让 AI Agent 像后端服务一样可监控、可排查、可优化，提升对运行时的观测的可审计性。
+Agent runtime observability: ingest, store, and inspect what an AI agent does at runtime.
 
-## 特性
+[简体中文](README.zh-CN.md)
 
-- **结构化 Trace**：OpenTelemetry 兼容，LLM / tool / agent / retrieval / chain 全链路 span
-- **瀑布图可视化**：trace 详情逐 span 展开，失败标红、重试可见
-- **实时监控**：Agent 成功率、延迟、错误率 WebSocket 实时推送
-- **分析洞察**：成功率 / 延迟分位 / 成本归因
-- **恢复策略观测**：重试、回退、上下文压缩一目了然
-- **自托管轻量**：Docker Compose 一键起，数据不出本机
-- **Rust 后端**：Axum + tokio + sqlx，编译期内存安全，高吞吐接入
+## What it does
 
-## 技术栈
+TracePilot ingests OpenTelemetry-compatible traces from AI agents, stores them in TimescaleDB, and renders them as a waterfall in the browser.
 
-| 层 | 选型 |
+## Implemented
+
+| Feature | Status |
 |---|---|
-| 后端 | Rust + Axum + tokio + sqlx + tracing |
-| 存储 | PostgreSQL 15 + TimescaleDB |
-| 前端 | Next.js 14 + React + TS + Tailwind + ECharts |
-| SDK | Python / TypeScript / Rust（OTel 兼容） |
+| Structured trace ingest (span model follows OTel semantics: trace_id / parent_span_id / kind / status / duration_ms / attributes) | Done |
+| TimescaleDB hypertable storage | Done |
+| Trace query + waterfall visualization | Done |
+| Project + API key management | Done |
 
-## 快速开始
+## Tech stack
+
+| Layer | Choice |
+|---|---|
+| Backend | Rust + Axum + tokio + sqlx |
+| Storage | PostgreSQL 15 + TimescaleDB |
+| Frontend | Next.js 14 + React + TypeScript + Tailwind + ECharts |
+| SDK | Python |
+
+## Quick start
 
 ```bash
-# 1. 启动数据库（Postgres + TimescaleDB）
+# 1. Start the database (Postgres + TimescaleDB)
 docker compose up -d db
 
-# 2. 启动后端（Rust）
+# 2. Start the backend (default DB URL matches the compose db service)
 cd backend && cargo run
 
-# 3. 启动前端
+# 3. Start the frontend
 cd frontend && npm install && npm run dev
 
-# 4. 跑示例 Agent，产生真实 trace
+# 4. Run the demo agent to produce a real trace
 python examples/demo_agent/run.py
 ```
 
-打开 http://localhost:3000 查看 trace。
+Open http://localhost:3000.
 
-## 架构
+## Architecture
 
 ```
-Agent(SDK) --OTel--> trace-ingest(Axum) --> storage(PG+TimescaleDB)
-                                          --> query/monitor/analytics/recovery
-                                          --> WebSocket + REST --> Next.js 前端
+Agent(SDK) --> ingest(Axum) --> storage(PG+TimescaleDB)
+                               --> query --> Next.js frontend (waterfall)
 ```
 
-详见 [docs/PLAN.md](docs/PLAN.md)。
+See [docs/PLAN.md](docs/PLAN.md) for the full spec.
 
-## 模块
+## Modules
 
-| 模块 | 职责 | 目录 |
+| Module | Role | Path | Status |
+|---|---|---|---|
+| ingest | trace intake | `backend/crates/api/src/modules/ingest` | Done |
+| storage | data layer | `backend/crates/api/src/modules/storage` | Done |
+| query | trace lookup | `backend/crates/api/src/modules/query` | Done |
+| iam | projects + API keys | `backend/crates/api/src/modules/iam` | Done |
+| monitor | realtime metrics | — | Roadmap |
+| analytics | success / latency / cost | — | Roadmap |
+| recovery | retry / fallback observation | — | Roadmap |
+| alert | alerting | — | Roadmap |
+
+Modules are plugins: each implements the `Module` trait and registers one line in `modules/mod.rs`. `main.rs` mounts them in topological order under `/api/<name>`.
+
+## API
+
+| Method | Path | Purpose |
 |---|---|---|
-| trace-ingest | 数据接入 | `backend/crates/api/src/modules/ingest` |
-| storage | 存储 | `backend/crates/api/src/modules/storage` |
-| trace-query | 查询 | `backend/crates/api/src/modules/query` |
-| monitor | 实时监控 | （M3 接入） |
-| analytics | 分析洞察 | （M3 接入） |
-| recovery | 恢复策略 | （M4 接入） |
-| iam | 鉴权 | `backend/crates/api/src/modules/iam` |
-| alert | 告警 | （M4 接入） |
+| POST | `/api/iam/projects` | Create project, returns api_key |
+| POST | `/api/ingest/traces` | Ingest a trace + spans |
+| GET | `/api/query/traces` | List traces (`project_id`, `limit`) |
+| GET | `/api/query/traces/{id}` | Trace detail with spans |
+| GET | `/api/health` | Health check |
 
-模块插件化：每模块实现 `Module` trait，在 `modules/mod.rs` registry 登记一行即挂载，核心 `main.rs` 不改。
+Auth: `X-TracePilot-Key: <api_key>` header on all non-health routes.
 
-## 开发规范
+## Development
 
-- 后端：`cargo fmt` + `cargo clippy -D warnings` + `cargo test`，pre-commit 拦截
-- 前端：ESLint + Prettier
-- 提交：Conventional Commits
-- 分支：`main` + `feature/*` + `fix/*`
+- Backend: `cargo fmt` + `cargo clippy -D warnings` + `cargo test`
+- Frontend: ESLint + Prettier
+- Commits: Conventional Commits
+- Branches: `main` + `feature/*` + `fix/*`
 
-详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Apache-2.0，见 [LICENSE](LICENSE)。
+Apache-2.0, see [LICENSE](LICENSE).

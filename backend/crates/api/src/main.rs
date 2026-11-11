@@ -37,7 +37,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app: Router<AppState> = Router::new();
     app = app.route("/api/health", axum::routing::get(|| async { "ok" }));
     for module in modules::registry() {
-        app = app.merge(module.router());
+        // 模块路由挂载在 /api/<模块名> 下，与 SDK / 前端约定的调用路径一致。
+        let prefix = format!("/api/{}", module.name());
+        app = app.nest(&prefix, module.router());
     }
     let app = app.layer(TraceLayer::new_for_http()).with_state(state);
 
