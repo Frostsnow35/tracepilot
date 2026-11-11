@@ -46,11 +46,20 @@
 - evaluate_alerts N+1 查询：enabled_alert_rules 一次查出 last_triggered_at
 - analytics/monitor/recovery 项目隔离：authenticate → authorize（按 project_id 校验）
 
+### Added — M5 产品化
+- 部署脚本：scripts/deploy.sh（一键 docker compose build → up → 健康检查 → 输出 URL）
+- 演示数据生成器：scripts/seed_demo.py（4 场景 × 3 Agent，一键灌入真实轨迹）
+- Demo 落地页：/demo（一键创建演示项目 + 功能展示 + 演示流程指引）
+- 前端设置页：/settings（项目信息、API Key 掩码展示与复制、新建项目）
+- 空项目健壮性：所有聚合查询 NULL 安全（Option<f64>.unwrap_or(0.0)），空项目不再 500
+- Makefile deploy/deploy-down/seed 目标
+
 ### Changed
 - 后端由 Python/FastAPI 迁移至 Rust/Axum（应需求：体现技术深度、内存安全、高吞吐）
 - 数据库镜像切换为 timescale/timescaledb:latest-pg16
 - 模块挂载从 Router::merge 改为 nest("/api/<name>")，与 SDK/前端调用路径对齐
 - spans 主键改为复合键 (id, recorded_at)（TS103：hypertable 唯一索引必须含分区列）
 - 聚合 SQL 类型转换：avg()::float8、sum()::bigint、date_trunc()::text（PG NUMERIC/TIMESTAMP 与 Rust 类型对齐）
+- docker-compose：加入 frontend 服务（Next.js 静态构建 + NEXT_PUBLIC_API_BASE），环境变量模板化 ${VAR:-default}
 
 [0.1.0]: https://github.com/Frostsnow35/tracepilot/releases/tag/v0.1.0
