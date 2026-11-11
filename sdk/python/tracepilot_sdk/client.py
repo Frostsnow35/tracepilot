@@ -66,3 +66,53 @@ class TracePilotClient:
         )
         r.raise_for_status()
         return r.json()
+
+    def monitor_stats(self, project_id: str) -> dict:
+        """FR-4：统计概览（total/success/error/avg/p50/p95）。"""
+        r = httpx.get(
+            f"{self.base_url}/api/monitor/stats",
+            params={"project_id": project_id},
+            headers=self._auth(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def monitor_agents(self, project_id: str) -> list[dict]:
+        """FR-4：按 agent 聚合统计。"""
+        r = httpx.get(
+            f"{self.base_url}/api/monitor/agents",
+            params={"project_id": project_id},
+            headers=self._auth(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def analytics_summary(self, project_id: str) -> dict:
+        """FR-5：成功率 + 延迟分位 + span 类型分布。"""
+        r = httpx.get(
+            f"{self.base_url}/api/analytics/summary",
+            params={"project_id": project_id},
+            headers=self._auth(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def analytics_latency(self, project_id: str) -> list[dict]:
+        """FR-5：小时级延迟时序。"""
+        r = httpx.get(
+            f"{self.base_url}/api/analytics/latency",
+            params={"project_id": project_id},
+            headers=self._auth(),
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def analytics_cost(self, project_id: str) -> list[dict]:
+        """FR-5：按 span 类型的成本拆解。"""
+        r = httpx.get(
+            f"{self.base_url}/api/analytics/cost",
+            params={"project_id": project_id},
+            headers=self._auth(),
+        )
+        r.raise_for_status()
+        return r.json()

@@ -132,7 +132,7 @@ impl Storage {
             "SELECT count(*) AS total,
                     count(*) FILTER (WHERE status = 'ok') AS success,
                     count(*) FILTER (WHERE status != 'ok') AS error,
-                    avg(duration_ms) AS avg_ms,
+                    avg(duration_ms)::float8 AS avg_ms,
                     percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms) AS p50,
                     percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95
              FROM traces WHERE project_id = $1",
@@ -159,7 +159,7 @@ impl Storage {
             "SELECT coalesce(agent_id, 'unknown') AS agent,
                     count(*) AS total,
                     count(*) FILTER (WHERE status = 'ok') AS success,
-                    avg(duration_ms) AS avg_ms,
+                    avg(duration_ms)::float8 AS avg_ms,
                     percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95
              FROM traces WHERE project_id = $1
              GROUP BY coalesce(agent_id, 'unknown')
@@ -190,7 +190,7 @@ impl Storage {
         let trace_row = sqlx::query(
             "SELECT count(*) AS total,
                     count(*) FILTER (WHERE status = 'ok') AS success,
-                    avg(duration_ms) AS avg_ms,
+                    avg(duration_ms)::float8 AS avg_ms,
                     percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms) AS p50,
                     percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95,
                     percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99
@@ -207,7 +207,7 @@ impl Storage {
             "SELECT kind,
                     count(*) AS total,
                     count(*) FILTER (WHERE status = 'ok') AS success,
-                    avg(duration_ms) AS avg_ms
+                    avg(duration_ms)::float8 AS avg_ms
              FROM spans
              WHERE trace_id IN (SELECT id FROM traces WHERE project_id = $1)
              GROUP BY kind
@@ -247,9 +247,9 @@ impl Storage {
         project_id: &str,
     ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
         let rows = sqlx::query(
-            "SELECT date_trunc('hour', started_at::timestamp) AS bucket,
+            "SELECT date_trunc('hour', started_at::timestamp)::text AS bucket,
                     count(*) AS total,
-                    avg(duration_ms) AS avg_ms,
+                    avg(duration_ms)::float8 AS avg_ms,
                     percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95,
                     count(*) FILTER (WHERE status = 'ok') AS success
              FROM traces
@@ -282,8 +282,8 @@ impl Storage {
         let rows = sqlx::query(
             "SELECT kind,
                     count(*) AS total,
-                    sum(duration_ms) AS total_ms,
-                    avg(duration_ms) AS avg_ms
+                    sum(duration_ms)::bigint AS total_ms,
+                    avg(duration_ms)::float8 AS avg_ms
              FROM spans
              WHERE trace_id IN (SELECT id FROM traces WHERE project_id = $1)
              GROUP BY kind

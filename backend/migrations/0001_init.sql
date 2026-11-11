@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS traces (
 );
 
 CREATE TABLE IF NOT EXISTS spans (
-    id              TEXT PRIMARY KEY,
+    id              TEXT NOT NULL,
     trace_id        TEXT NOT NULL REFERENCES traces(id),
     parent_span_id  TEXT,
     name            TEXT NOT NULL,
@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS spans (
     started_at      TEXT NOT NULL,
     duration_ms     BIGINT NOT NULL,
     attributes      JSONB NOT NULL DEFAULT '{}'::jsonb,
-    recorded_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    recorded_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- TimescaleDB 要求 hypertable 的唯一索引必须包含分区列，故主键为复合键。
+    PRIMARY KEY (id, recorded_at)
 );
 
 SELECT create_hypertable('spans', 'recorded_at', if_not_exists => TRUE);
