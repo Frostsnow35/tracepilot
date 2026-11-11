@@ -1,0 +1,24 @@
+[package]
+name = "tracepilot-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tracepilot-core = { path = "../core" }
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "uuid", "json", "migrate", "macros"] }
+tokio-postgres = "0.7"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { version = "1", features = ["v4", "serde"] }
+sha2 = "0.10"
+hex = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+tower-http = { version = "0.6", features = ["trace"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }

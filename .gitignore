@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Rust
+target/
+
+# Node / Frontend
+node_modules/
+.next/
+out/
+build/
+*.local
+.DS_Store
+
+# Env & Secrets
+.env
+.env.*
+!.env.example
+*.pem
+secrets/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
+logs/
