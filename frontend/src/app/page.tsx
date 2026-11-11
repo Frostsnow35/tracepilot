@@ -32,7 +32,7 @@ export default function Home() {
 
   useEffect(() => {
     if (key && projectId) load();
-  }, [load]);
+  }, [key, projectId, load]);
 
   const create = async () => {
     setLoading(true);
