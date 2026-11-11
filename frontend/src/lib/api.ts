@@ -76,6 +76,11 @@ export const api = {
       `/api/alert/rules/${ruleId}?project_id=${projectId}`,
       { method: "DELETE" },
     ),
+  updateAlertRule: (projectId: string, ruleId: string, enabled: boolean) =>
+    request<{ updated: boolean; enabled: boolean }>(
+      `/api/alert/rules/${ruleId}`,
+      { method: "PATCH", body: JSON.stringify({ project_id: projectId, enabled }) },
+    ),
   alertEvents: (projectId: string, limit = 50) =>
     request<AlertEvent[]>(`/api/alert/events?project_id=${projectId}&limit=${limit}`),
 };

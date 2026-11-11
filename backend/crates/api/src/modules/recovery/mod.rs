@@ -46,8 +46,8 @@ async fn stats(
     headers: HeaderMap,
     Query(params): Query<RecoveryQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    iam::authenticate(&headers, &state)?;
-    let stats = state.storage.recovery_stats(&params.project_id).await?;
+    let project_id = iam::authorize(&headers, &params.project_id, &state).await?;
+    let stats = state.storage.recovery_stats(&project_id).await?;
     Ok(Json(stats))
 }
 
@@ -56,8 +56,8 @@ async fn agents(
     headers: HeaderMap,
     Query(params): Query<RecoveryQuery>,
 ) -> Result<Json<Vec<serde_json::Value>>, AppError> {
-    iam::authenticate(&headers, &state)?;
-    let agents = state.storage.recovery_agents(&params.project_id).await?;
+    let project_id = iam::authorize(&headers, &params.project_id, &state).await?;
+    let agents = state.storage.recovery_agents(&project_id).await?;
     Ok(Json(agents))
 }
 
@@ -66,10 +66,10 @@ async fn traces(
     headers: HeaderMap,
     Query(params): Query<RecoveryQuery>,
 ) -> Result<Json<Vec<tracepilot_core::Trace>>, AppError> {
-    iam::authenticate(&headers, &state)?;
+    let project_id = iam::authorize(&headers, &params.project_id, &state).await?;
     let traces = state
         .storage
-        .recovery_traces(&params.project_id, params.limit)
+        .recovery_traces(&project_id, params.limit)
         .await?;
     Ok(Json(traces))
 }

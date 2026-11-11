@@ -32,6 +32,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/alerts" className="text-blue-600 hover:underline">
                 告警
               </Link>
+              <Link href="/settings" className="text-blue-600 hover:underline">
+                设置
+              </Link>
             </div>
           </div>
         </nav>

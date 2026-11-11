@@ -32,6 +32,12 @@ pub struct CreateRuleReq {
     pub threshold: f64,
 }
 
+#[derive(Deserialize)]
+pub struct UpdateRuleReq {
+    pub project_id: String,
+    pub enabled: bool,
+}
+
 #[derive(Serialize)]
 pub struct RuleResp {
     pub id: String,
@@ -79,7 +85,7 @@ impl Module for AlertModule {
     fn router(&self) -> Router<AppState> {
         Router::new()
             .route("/rules", get(list_rules).post(create_rule))
-            .route("/rules/:id", delete(delete_rule))
+            .route("/rules/:id", delete(delete_rule).patch(update_rule))
             .route("/events", get(list_events))
     }
 }
@@ -89,8 +95,8 @@ async fn list_rules(
     headers: HeaderMap,
     Query(params): Query<AlertQuery>,
 ) -> Result<Json<Vec<serde_json::Value>>, AppError> {
-    iam::authenticate(&headers, &state)?;
-    let rules = state.storage.list_alert_rules(&params.project_id).await?;
+    let project_id = iam::authorize(&headers, &params.project_id, &state).await?;
+    let rules = state.storage.list_alert_rules(&project_id).await?;
     Ok(Json(rules))
 }
 
@@ -99,11 +105,11 @@ async fn create_rule(
     headers: HeaderMap,
     Json(req): Json<CreateRuleReq>,
 ) -> Result<Json<RuleResp>, AppError> {
-    iam::authenticate(&headers, &state)?;
+    let project_id = iam::authorize(&headers, &req.project_id, &state).await?;
     validate_rule(&req)?;
     let rule = state
         .storage
-        .create_alert_rule(&req.project_id, &req.metric, &req.operator, req.threshold)
+        .create_alert_rule(&project_id, &req.metric, &req.operator, req.threshold)
         .await?;
     Ok(Json(RuleResp {
         id: rule
@@ -132,10 +138,10 @@ async fn delete_rule(
     Query(params): Query<AlertQuery>,
     Path(rule_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    iam::authenticate(&headers, &state)?;
+    let project_id = iam::authorize(&headers, &params.project_id, &state).await?;
     let deleted = state
         .storage
-        .delete_alert_rule(&params.project_id, &rule_id)
+        .delete_alert_rule(&project_id, &rule_id)
         .await?;
     if deleted {
         Ok(Json(serde_json::json!({"deleted": true})))
@@ -144,15 +150,34 @@ async fn delete_rule(
     }
 }
 
+async fn update_rule(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(rule_id): Path<String>,
+    Json(req): Json<UpdateRuleReq>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let project_id = iam::authorize(&headers, &req.project_id, &state).await?;
+    let updated = state
+        .storage
+        .set_alert_rule_enabled(&project_id, &rule_id, req.enabled)
+        .await?;
+    if updated == 0 {
+        return Err(AppError::NotFound("alert rule not found".into()));
+    }
+    Ok(Json(
+        serde_json::json!({"updated": true, "enabled": req.enabled}),
+    ))
+}
+
 async fn list_events(
     State(state): State<AppState>,
     headers: HeaderMap,
     Query(params): Query<AlertQuery>,
 ) -> Result<Json<Vec<serde_json::Value>>, AppError> {
-    iam::authenticate(&headers, &state)?;
+    let project_id = iam::authorize(&headers, &params.project_id, &state).await?;
     let events = state
         .storage
-        .list_alert_events(&params.project_id, params.limit)
+        .list_alert_events(&project_id, params.limit)
         .await?;
     Ok(Json(events))
 }

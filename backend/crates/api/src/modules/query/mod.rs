@@ -41,9 +41,9 @@ async fn list_traces(
     headers: HeaderMap,
     Query(params): Query<ListQuery>,
 ) -> Result<Json<Vec<tracepilot_core::Trace>>, AppError> {
-    iam::authenticate(&headers, &state)?;
+    let project_id = iam::authorize(&headers, &params.project_id, &state).await?;
     let limit = params.limit.unwrap_or(50).clamp(1, 500);
-    let traces = state.storage.list_traces(&params.project_id, limit).await?;
+    let traces = state.storage.list_traces(&project_id, limit).await?;
     Ok(Json(traces))
 }
 
@@ -52,10 +52,12 @@ async fn get_trace_detail(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    iam::authenticate(&headers, &state)?;
+    // 先鉴权再查库：未认证请求不触发 DB 查询，且"不存在"与"非本项目"
+    // 统一返回 NotFound，避免 trace id 存在性枚举。
+    let project_id = iam::authenticate(&headers, &state).await?;
     let trace = state
         .storage
-        .get_trace(&id)
+        .get_trace_owned(&id, &project_id)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("trace {id}")))?;
     let spans = state.storage.get_spans_by_trace(&id).await?;

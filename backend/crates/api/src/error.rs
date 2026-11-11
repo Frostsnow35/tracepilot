@@ -20,7 +20,10 @@ impl IntoResponse for AppError {
             AppError::NotFound(m) => (StatusCode::NOT_FOUND, m),
             AppError::Internal(m) => {
                 tracing::error!(error = %m, "internal error");
-                (StatusCode::INTERNAL_SERVER_ERROR, m)
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal server error".into(),
+                )
             }
         };
         (code, axum::Json(json!({ "error": msg }))).into_response()

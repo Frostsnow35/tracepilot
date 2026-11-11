@@ -40,8 +40,8 @@ async fn summary(
     headers: HeaderMap,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    iam::authenticate(&headers, &state)?;
-    let summary = state.storage.analytics_summary(&params.project_id).await?;
+    let project_id = iam::authorize(&headers, &params.project_id, &state).await?;
+    let summary = state.storage.analytics_summary(&project_id).await?;
     Ok(Json(summary))
 }
 
@@ -50,8 +50,8 @@ async fn latency(
     headers: HeaderMap,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<Vec<serde_json::Value>>, AppError> {
-    iam::authenticate(&headers, &state)?;
-    let series = state.storage.latency_timeseries(&params.project_id).await?;
+    let project_id = iam::authorize(&headers, &params.project_id, &state).await?;
+    let series = state.storage.latency_timeseries(&project_id).await?;
     Ok(Json(series))
 }
 
@@ -60,7 +60,7 @@ async fn cost(
     headers: HeaderMap,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<Vec<serde_json::Value>>, AppError> {
-    iam::authenticate(&headers, &state)?;
-    let breakdown = state.storage.cost_breakdown(&params.project_id).await?;
+    let project_id = iam::authorize(&headers, &params.project_id, &state).await?;
+    let breakdown = state.storage.cost_breakdown(&project_id).await?;
     Ok(Json(breakdown))
 }

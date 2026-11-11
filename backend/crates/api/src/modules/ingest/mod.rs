@@ -35,7 +35,9 @@ async fn create_trace(
     headers: HeaderMap,
     Json(body): Json<IngestPayload>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    iam::authenticate(&headers, &state)?;
+    // 鉴权 + 项目隔离：trace 的 project_id 必须属于该 API Key。
+    // insert_trace 用 body.trace 自带 project_id，authorize 已校验其与 Key 所属项目一致。
+    iam::authorize(&headers, &body.trace.project_id, &state).await?;
 
     if body.spans.len() > state.config.ingest_batch_max {
         return Err(AppError::BadRequest(format!(
@@ -45,10 +47,10 @@ async fn create_trace(
         )));
     }
 
-    state.storage.insert_trace(&body.trace).await?;
-    for span in &body.spans {
-        state.storage.insert_span(span).await?;
-    }
+    state
+        .storage
+        .insert_trace_with_spans(&body.trace, &body.spans)
+        .await?;
 
     tracing::info!(
         trace_id = %body.trace.id,

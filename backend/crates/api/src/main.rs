@@ -49,29 +49,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::spawn(async move {
             let mut last_seen = chrono::Utc::now();
             loop {
-                // 列出所有 project_id，逐个扫描新 trace。
+                // 查询前先捕获当前时间作为上界：若在查询结束后才推进水位线，
+                // 窗口内入库的 trace 会被永久跳过（监控漏推）。
+                let upper = chrono::Utc::now();
                 let projects: Vec<String> =
-                    sqlx::query_scalar("SELECT id FROM projects ORDER BY created_at")
+                    match sqlx::query_scalar("SELECT id FROM projects ORDER BY created_at")
                         .fetch_all(&pool)
                         .await
-                        .unwrap_or_default();
+                    {
+                        Ok(p) => p,
+                        Err(e) => {
+                            tracing::warn!(error = %e, "failed to list projects for monitor poll");
+                            Vec::new()
+                        }
+                    };
 
                 for project_id in projects {
-                    if let Ok(traces) = storage.list_traces_since(&project_id, last_seen, 200).await
+                    match storage
+                        .list_traces_since(&project_id, last_seen, upper, 200)
+                        .await
                     {
-                        for t in traces {
-                            let _ = monitor_tx.send(TraceEvent {
-                                trace_id: t.id,
-                                project_id: t.project_id,
-                                agent_id: t.agent_id,
-                                status: t.status,
-                                started_at: t.started_at,
-                                duration_ms: t.duration_ms,
-                            });
+                        Ok(traces) => {
+                            for t in traces {
+                                let _ = monitor_tx.send(TraceEvent {
+                                    trace_id: t.id,
+                                    project_id: t.project_id,
+                                    agent_id: t.agent_id,
+                                    status: t.status,
+                                    started_at: t.started_at,
+                                    duration_ms: t.duration_ms,
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                project_id = %project_id,
+                                error = %e,
+                                "failed to poll traces since watermark"
+                            );
                         }
                     }
                 }
-                last_seen = chrono::Utc::now();
+                last_seen = upper;
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             }
         });
@@ -84,10 +103,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::spawn(async move {
             loop {
                 let projects: Vec<String> =
-                    sqlx::query_scalar("SELECT id FROM projects ORDER BY created_at")
+                    match sqlx::query_scalar("SELECT id FROM projects ORDER BY created_at")
                         .fetch_all(&pool)
                         .await
-                        .unwrap_or_default();
+                    {
+                        Ok(p) => p,
+                        Err(e) => {
+                            tracing::warn!(error = %e, "failed to list projects for alert eval");
+                            Vec::new()
+                        }
+                    };
 
                 for project_id in projects {
                     if let Err(e) = storage

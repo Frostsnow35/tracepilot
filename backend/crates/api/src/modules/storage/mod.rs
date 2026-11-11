@@ -23,7 +23,13 @@ impl Storage {
         &self.pool
     }
 
-    pub async fn insert_trace(&self, trace: &Trace) -> Result<(), sqlx::Error> {
+    /// 批量写入 trace + spans（同一事务，避免中途失败留下"有 trace 无 span"的半成品）。
+    pub async fn insert_trace_with_spans(
+        &self,
+        trace: &Trace,
+        spans: &[tracepilot_core::Span],
+    ) -> Result<(), sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
         sqlx::query(
             "INSERT INTO traces (id, project_id, agent_id, status, started_at, duration_ms)
              VALUES ($1, $2, $3, $4, $5, $6)",
@@ -34,36 +40,42 @@ impl Storage {
         .bind(&trace.status)
         .bind(&trace.started_at)
         .bind(trace.duration_ms)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+        for span in spans {
+            sqlx::query(
+                "INSERT INTO spans (id, trace_id, parent_span_id, name, kind, status, started_at, duration_ms, attributes)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            )
+            .bind(&span.id)
+            .bind(&span.trace_id)
+            .bind(&span.parent_span_id)
+            .bind(&span.name)
+            .bind(&span.kind)
+            .bind(&span.status)
+            .bind(&span.started_at)
+            .bind(span.duration_ms)
+            .bind(span.attributes.clone())
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
         Ok(())
     }
 
-    pub async fn insert_span(&self, span: &Span) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "INSERT INTO spans (id, trace_id, parent_span_id, name, kind, status, started_at, duration_ms, attributes)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-        )
-        .bind(&span.id)
-        .bind(&span.trace_id)
-        .bind(&span.parent_span_id)
-        .bind(&span.name)
-        .bind(&span.kind)
-        .bind(&span.status)
-        .bind(&span.started_at)
-        .bind(span.duration_ms)
-        .bind(span.attributes.clone())
-        .execute(&self.pool)
-        .await?;
-        Ok(())
-    }
-
-    pub async fn get_trace(&self, id: &str) -> Result<Option<Trace>, sqlx::Error> {
+    /// 按 id + project_id 查 trace（鉴权后的项目隔离查询，避免先查库后鉴权
+    /// 造成的未授权访问与 trace 存在性枚举）。
+    pub async fn get_trace_owned(
+        &self,
+        id: &str,
+        project_id: &str,
+    ) -> Result<Option<Trace>, sqlx::Error> {
         let row = sqlx::query(
             "SELECT id, project_id, agent_id, status, started_at, duration_ms
-             FROM traces WHERE id = $1",
+             FROM traces WHERE id = $1 AND project_id = $2",
         )
         .bind(id)
+        .bind(project_id)
         .fetch_optional(&self.pool)
         .await?;
         Ok(row.map(|r| Trace {
@@ -306,22 +318,26 @@ impl Storage {
             .collect())
     }
 
-    /// 列出 recorded_at 之后的新 trace（monitor 后台轮询水位线）。
+    /// 列出 recorded_at 在 (after, before] 窗口内的新 trace（monitor 后台轮询水位线）。
+    /// before 为上界：调用方在发起查询前捕获 now()，避免查询期间新入库的 trace
+    /// 落在窗口外被跳过。
     pub async fn list_traces_since(
         &self,
         project_id: &str,
         after: chrono::DateTime<chrono::Utc>,
+        before: chrono::DateTime<chrono::Utc>,
         limit: i64,
     ) -> Result<Vec<Trace>, sqlx::Error> {
         let rows = sqlx::query(
             "SELECT id, project_id, agent_id, status, started_at, duration_ms
              FROM traces
-             WHERE project_id = $1 AND recorded_at > $2
+             WHERE project_id = $1 AND recorded_at > $2 AND recorded_at <= $3
              ORDER BY recorded_at
-             LIMIT $3",
+             LIMIT $4",
         )
         .bind(project_id)
         .bind(after)
+        .bind(before)
         .bind(limit)
         .fetch_all(&self.pool)
         .await?;
@@ -345,7 +361,7 @@ impl Storage {
             "SELECT
                     count(*) AS total_spans,
                     count(*) FILTER (WHERE s.status != 'ok') AS error_spans,
-                    count(*) FILTER (WHERE (s.attributes->>'attempt')::int > 1) AS retry_spans,
+                    count(*) FILTER (WHERE (s.attributes->>'attempt') ~ '^[0-9]+$' AND (s.attributes->>'attempt')::int > 1) AS retry_spans,
                     count(DISTINCT t.id) FILTER (WHERE t.status = 'ok' AND EXISTS (
                         SELECT 1 FROM spans s2 WHERE s2.trace_id = t.id AND s2.status != 'ok'
                     )) AS recovered_traces,
@@ -376,7 +392,7 @@ impl Storage {
         let rows = sqlx::query(
             "SELECT coalesce(t.agent_id, 'unknown') AS agent,
                     count(*) FILTER (WHERE s.status != 'ok') AS error_spans,
-                    count(*) FILTER (WHERE (s.attributes->>'attempt')::int > 1) AS retry_spans,
+                    count(*) FILTER (WHERE (s.attributes->>'attempt') ~ '^[0-9]+$' AND (s.attributes->>'attempt')::int > 1) AS retry_spans,
                     count(DISTINCT t.id) FILTER (WHERE t.status != 'ok') AS failed_traces,
                     count(DISTINCT t.id) AS total_traces
              FROM spans s
@@ -415,7 +431,7 @@ impl Storage {
                AND (
                     t.status != 'ok'
                     OR EXISTS (SELECT 1 FROM spans s WHERE s.trace_id = t.id AND s.status != 'ok')
-                    OR EXISTS (SELECT 1 FROM spans s WHERE s.trace_id = t.id AND (s.attributes->>'attempt')::int > 1)
+                    OR EXISTS (SELECT 1 FROM spans s WHERE s.trace_id = t.id AND (s.attributes->>'attempt') ~ '^[0-9]+$' AND (s.attributes->>'attempt')::int > 1)
                )
              ORDER BY t.started_at DESC
              LIMIT $2",
@@ -506,7 +522,25 @@ impl Storage {
         Ok(res.rows_affected() > 0)
     }
 
-    /// 记录一次告警触发事件，同时刷新规则的 last_triggered_at。
+    /// 启用/停用规则。返回更新后的行数（0 表示项目下无此规则）。
+    pub async fn set_alert_rule_enabled(
+        &self,
+        project_id: &str,
+        rule_id: &str,
+        enabled: bool,
+    ) -> Result<u64, sqlx::Error> {
+        let res =
+            sqlx::query("UPDATE alert_rules SET enabled = $3 WHERE id = $1 AND project_id = $2")
+                .bind(rule_id)
+                .bind(project_id)
+                .bind(enabled)
+                .execute(&self.pool)
+                .await?;
+        Ok(res.rows_affected())
+    }
+
+    /// 记录一次告警触发事件，同时刷新规则的 last_triggered_at（同一事务，
+    /// 避免事件已写但冷却时间未更新导致重复触发）。
     pub async fn record_alert_event(
         &self,
         project_id: &str,
@@ -516,6 +550,7 @@ impl Storage {
         threshold: f64,
     ) -> Result<(), sqlx::Error> {
         let event_id = Uuid::new_v4().to_string();
+        let mut tx = self.pool.begin().await?;
         sqlx::query(
             "INSERT INTO alert_events (id, project_id, rule_id, metric, value, threshold)
              VALUES ($1, $2, $3, $4, $5, $6)",
@@ -526,12 +561,13 @@ impl Storage {
         .bind(metric)
         .bind(value)
         .bind(threshold)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
         sqlx::query("UPDATE alert_rules SET last_triggered_at = now() WHERE id = $1")
             .bind(rule_id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
+        tx.commit().await?;
         Ok(())
     }
 
@@ -570,13 +606,22 @@ impl Storage {
             .collect())
     }
 
-    /// 取启用的规则（alert 后台评估任务用）。
+    /// 取启用的规则（含冷却时间戳，alert 后台评估任务用，一次查询避免 N+1）。
     pub async fn enabled_alert_rules(
         &self,
         project_id: &str,
-    ) -> Result<Vec<(String, String, String, f64)>, sqlx::Error> {
+    ) -> Result<
+        Vec<(
+            String,
+            String,
+            String,
+            f64,
+            Option<chrono::DateTime<chrono::Utc>>,
+        )>,
+        sqlx::Error,
+    > {
         let rows = sqlx::query(
-            "SELECT id, metric, operator, threshold FROM alert_rules
+            "SELECT id, metric, operator, threshold, last_triggered_at FROM alert_rules
              WHERE project_id = $1 AND enabled = TRUE",
         )
         .bind(project_id)
@@ -590,6 +635,7 @@ impl Storage {
                     r.get::<String, _>("metric"),
                     r.get::<String, _>("operator"),
                     r.get::<f64, _>("threshold"),
+                    r.get::<Option<chrono::DateTime<chrono::Utc>>, _>("last_triggered_at"),
                 )
             })
             .collect())
@@ -605,14 +651,8 @@ impl Storage {
     ) -> Result<usize, sqlx::Error> {
         let rules = self.enabled_alert_rules(project_id).await?;
         let mut triggered = 0;
-        for (rule_id, metric, operator, threshold) in rules {
+        for (rule_id, metric, operator, threshold, last) in rules {
             // 冷却检查：last_triggered_at 距今不足 cooldown 则跳过。
-            let last: Option<chrono::DateTime<chrono::Utc>> =
-                sqlx::query_scalar("SELECT last_triggered_at FROM alert_rules WHERE id = $1")
-                    .bind(&rule_id)
-                    .fetch_optional(&self.pool)
-                    .await?
-                    .flatten();
             if let Some(t) = last {
                 if now - t < cooldown {
                     continue;

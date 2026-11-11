@@ -58,8 +58,8 @@ async fn stats(
     headers: HeaderMap,
     Query(params): Query<MonitorQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    iam::authenticate(&headers, &state)?;
-    let stats = state.storage.monitor_stats(&params.project_id).await?;
+    let project_id = iam::authorize(&headers, &params.project_id, &state).await?;
+    let stats = state.storage.monitor_stats(&project_id).await?;
     Ok(Json(stats))
 }
 
@@ -68,8 +68,8 @@ async fn agents(
     headers: HeaderMap,
     Query(params): Query<MonitorQuery>,
 ) -> Result<Json<Vec<serde_json::Value>>, AppError> {
-    iam::authenticate(&headers, &state)?;
-    let agents = state.storage.agent_stats(&params.project_id).await?;
+    let project_id = iam::authorize(&headers, &params.project_id, &state).await?;
+    let agents = state.storage.agent_stats(&project_id).await?;
     Ok(Json(agents))
 }
 
@@ -80,7 +80,9 @@ async fn stream(
 ) -> Result<axum::response::Response, AppError> {
     // WebSocket 握手无法携带自定义 header，鉴权改为 query 传 api_key。
     let key = params.api_key.as_deref().ok_or(AppError::Unauthorized)?;
-    if key.trim().is_empty() {
+    let project_id = iam::authenticate_key(key, &state).await?;
+    // 项目隔离：订阅的 project_id 必须属于该 Key。
+    if params.project_id != project_id {
         return Err(AppError::Unauthorized);
     }
     Ok(ws.on_upgrade(move |socket| handle_socket(socket, state, params.project_id)))

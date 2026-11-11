@@ -83,6 +83,18 @@ export default function AlertsPage() {
     }
   };
 
+  const toggleRule = async (rule: AlertRule) => {
+    const pid = getProjectId();
+    if (!pid) return;
+    setError("");
+    try {
+      await api.updateAlertRule(pid, rule.id, !rule.enabled);
+      load();
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   if (!projectId) {
     return (
       <main className="mx-auto max-w-5xl p-8">
@@ -184,6 +196,14 @@ export default function AlertsPage() {
                 {r.last_triggered_at ? r.last_triggered_at.slice(0, 19).replace("T", " ") : "-"}
               </td>
               <td className="py-2">
+                <button
+                  onClick={() => toggleRule(r)}
+                  className={`mr-3 text-xs ${
+                    r.enabled ? "text-gray-500" : "text-green-600"
+                  } hover:underline`}
+                >
+                  {r.enabled ? "停用" : "启用"}
+                </button>
                 <button
                   onClick={() => removeRule(r.id)}
                   className="text-red-600 hover:underline"

@@ -184,6 +184,16 @@ class TracePilotClient:
         r.raise_for_status()
         return r.json()
 
+    def update_alert_rule(self, project_id: str, rule_id: str, enabled: bool) -> dict:
+        """FR-8：启用/停用告警规则。"""
+        r = httpx.patch(
+            f"{self.base_url}/api/alert/rules/{rule_id}",
+            json={"project_id": project_id, "enabled": enabled},
+            headers=self._auth(),
+        )
+        r.raise_for_status()
+        return r.json()
+
     def alert_events(self, project_id: str, limit: int = 50) -> list[dict]:
         """FR-8：列出告警触发事件。"""
         r = httpx.get(
