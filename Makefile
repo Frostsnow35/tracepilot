@@ -1,4 +1,4 @@
-.PHONY: help db backend frontend test lint format check docker-up docker-down
+.PHONY: help db backend frontend test lint format check docker-up docker-down deploy deploy-down seed
 
 help:
 	@echo "TracePilot dev commands"
@@ -11,6 +11,9 @@ help:
 	@echo "  make check       - fmt --check + clippy + test"
 	@echo "  make docker-up   - start full stack"
 	@echo "  make docker-down - stop full stack"
+	@echo "  make deploy      - one-shot deploy: build + up + healthcheck"
+	@echo "  make deploy-down - stop and remove containers (keep data)"
+	@echo "  make seed        - generate demo traces into running instance"
 
 db:
 	docker compose up -d db
@@ -40,3 +43,12 @@ docker-up:
 
 docker-down:
 	docker compose down
+
+deploy:
+	bash scripts/deploy.sh
+
+deploy-down:
+	bash scripts/deploy.sh --down
+
+seed:
+	python scripts/seed_demo.py

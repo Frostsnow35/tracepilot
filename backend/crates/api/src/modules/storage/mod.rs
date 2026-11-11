@@ -140,6 +140,7 @@ impl Storage {
     }
 
     /// 监控概览（FR-4）：总量 / 成功 / 失败 / 平均延迟 / p50 / p95。
+    /// 空项目时 avg/percentile 返回 NULL，用 Option 解码避免 panic。
     pub async fn monitor_stats(&self, project_id: &str) -> Result<serde_json::Value, sqlx::Error> {
         let row = sqlx::query(
             "SELECT count(*) AS total,
@@ -157,9 +158,9 @@ impl Storage {
             "total": row.get::<i64, _>("total"),
             "success": row.get::<i64, _>("success"),
             "error": row.get::<i64, _>("error"),
-            "avg_ms": row.get::<f64, _>("avg_ms"),
-            "p50_ms": row.get::<f64, _>("p50"),
-            "p95_ms": row.get::<f64, _>("p95"),
+            "avg_ms": row.get::<Option<f64>, _>("avg_ms").unwrap_or(0.0),
+            "p50_ms": row.get::<Option<f64>, _>("p50").unwrap_or(0.0),
+            "p95_ms": row.get::<Option<f64>, _>("p95").unwrap_or(0.0),
         }))
     }
 
@@ -188,8 +189,8 @@ impl Storage {
                     "agent": r.get::<String, _>("agent"),
                     "total": r.get::<i64, _>("total"),
                     "success": r.get::<i64, _>("success"),
-                    "avg_ms": r.get::<f64, _>("avg_ms"),
-                    "p95_ms": r.get::<f64, _>("p95"),
+                    "avg_ms": r.get::<Option<f64>, _>("avg_ms").unwrap_or(0.0),
+                    "p95_ms": r.get::<Option<f64>, _>("p95").unwrap_or(0.0),
                 })
             })
             .collect())
@@ -237,7 +238,7 @@ impl Storage {
                     "kind": r.get::<String, _>("kind"),
                     "total": r.get::<i64, _>("total"),
                     "success": r.get::<i64, _>("success"),
-                    "avg_ms": r.get::<f64, _>("avg_ms"),
+                    "avg_ms": r.get::<Option<f64>, _>("avg_ms").unwrap_or(0.0),
                 })
             })
             .collect();
@@ -246,10 +247,10 @@ impl Storage {
             "total": total,
             "success": success,
             "success_rate": if total > 0 { (success as f64) / (total as f64) } else { 0.0 },
-            "avg_ms": trace_row.get::<f64, _>("avg_ms"),
-            "p50_ms": trace_row.get::<f64, _>("p50"),
-            "p95_ms": trace_row.get::<f64, _>("p95"),
-            "p99_ms": trace_row.get::<f64, _>("p99"),
+            "avg_ms": trace_row.get::<Option<f64>, _>("avg_ms").unwrap_or(0.0),
+            "p50_ms": trace_row.get::<Option<f64>, _>("p50").unwrap_or(0.0),
+            "p95_ms": trace_row.get::<Option<f64>, _>("p95").unwrap_or(0.0),
+            "p99_ms": trace_row.get::<Option<f64>, _>("p99").unwrap_or(0.0),
             "span_kinds": kinds,
         }))
     }
@@ -279,8 +280,8 @@ impl Storage {
                 json!({
                     "bucket": r.get::<String, _>("bucket"),
                     "total": r.get::<i64, _>("total"),
-                    "avg_ms": r.get::<f64, _>("avg_ms"),
-                    "p95_ms": r.get::<f64, _>("p95"),
+                    "avg_ms": r.get::<Option<f64>, _>("avg_ms").unwrap_or(0.0),
+                    "p95_ms": r.get::<Option<f64>, _>("p95").unwrap_or(0.0),
                     "success": r.get::<i64, _>("success"),
                 })
             })
@@ -312,7 +313,7 @@ impl Storage {
                     "kind": r.get::<String, _>("kind"),
                     "total": r.get::<i64, _>("total"),
                     "total_ms": r.get::<i64, _>("total_ms"),
-                    "avg_ms": r.get::<f64, _>("avg_ms"),
+                    "avg_ms": r.get::<Option<f64>, _>("avg_ms").unwrap_or(0.0),
                 })
             })
             .collect())

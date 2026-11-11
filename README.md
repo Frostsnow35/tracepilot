@@ -18,6 +18,8 @@ TracePilot ingests OpenTelemetry-compatible traces from AI agents, stores them i
 | Project + API key management | Done |
 | Realtime monitor (stat overview, per-agent stats, WebSocket live stream) | Done |
 | Analytics (success rate, latency trend, cost breakdown) | Done |
+| Recovery observation (retry spans, recovered traces, per-agent failure stats) | Done |
+| Threshold alerting (error_rate / p95_ms / avg_ms, 30s evaluation, 10min cooldown) | Done |
 
 ## Tech stack
 
@@ -65,8 +67,8 @@ See [docs/PLAN.md](docs/PLAN.md) for the full spec.
 | iam | projects + API keys | `backend/crates/api/src/modules/iam` | Done |
 | monitor | realtime metrics | `backend/crates/api/src/modules/monitor` | Done |
 | analytics | success / latency / cost | `backend/crates/api/src/modules/analytics` | Done |
-| recovery | retry / fallback observation | — | Roadmap |
-| alert | alerting | — | Roadmap |
+| recovery | retry / fallback observation | `backend/crates/api/src/modules/recovery` | Done |
+| alert | alerting | `backend/crates/api/src/modules/alert` | Done |
 
 Modules are plugins: each implements the `Module` trait and registers one line in `modules/mod.rs`. `main.rs` mounts them in topological order under `/api/<name>`.
 
@@ -84,6 +86,14 @@ Modules are plugins: each implements the `Module` trait and registers one line i
 | GET | `/api/analytics/summary` | Success rate + latency percentiles + kind stats (`project_id`) |
 | GET | `/api/analytics/latency` | Hourly latency timeseries (`project_id`) |
 | GET | `/api/analytics/cost` | Cost breakdown by span kind (`project_id`) |
+| GET | `/api/recovery/stats` | Recovery overview (error/retry spans, recovered/failed traces) |
+| GET | `/api/recovery/agents` | Per-agent recovery stats (`project_id`) |
+| GET | `/api/recovery/traces` | Traces with failures or retries (`project_id`, `limit`) |
+| GET | `/api/alert/rules` | List alert rules (`project_id`) |
+| POST | `/api/alert/rules` | Create alert rule (metric, operator, threshold) |
+| PATCH | `/api/alert/rules/{id}` | Enable/disable a rule |
+| DELETE | `/api/alert/rules/{id}` | Delete a rule |
+| GET | `/api/alert/events` | Alert trigger events (`project_id`, `limit`) |
 | GET | `/api/health` | Health check |
 
 Auth: `X-TracePilot-Key: <api_key>` header on all non-health routes. WebSocket auth goes through the `api_key` query param because browsers cannot set custom headers on WS handshakes.

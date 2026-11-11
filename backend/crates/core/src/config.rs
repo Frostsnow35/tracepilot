@@ -7,6 +7,7 @@ pub struct Config {
     pub database_url: String,
     pub api_key_header: String,
     pub ingest_batch_max: usize,
+    pub port: u16,
 }
 
 impl Config {
@@ -24,6 +25,10 @@ impl Config {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(500),
+            port: std::env::var("TRACEPILOT_PORT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(8000),
         }
     }
 }

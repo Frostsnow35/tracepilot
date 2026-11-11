@@ -140,7 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let app = app.layer(TraceLayer::new_for_http()).with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await?;
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", config.port)).await?;
     tracing::info!(addr = %listener.local_addr()?, "listening");
     axum::serve(listener, app).await?;
     Ok(())

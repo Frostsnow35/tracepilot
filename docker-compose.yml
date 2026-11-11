@@ -3,15 +3,15 @@ services:
     image: timescale/timescaledb:latest-pg16
     container_name: tracepilot-db
     environment:
-      POSTGRES_DB: tracepilot
-      POSTGRES_USER: tracepilot
-      POSTGRES_PASSWORD: tracepilot
+      POSTGRES_DB: ${POSTGRES_DB:-tracepilot}
+      POSTGRES_USER: ${POSTGRES_USER:-tracepilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tracepilot}
     ports:
       - "5432:5432"
     volumes:
       - dbdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tracepilot"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tracepilot}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -20,14 +20,27 @@ services:
     build: ./backend
     container_name: tracepilot-backend
     environment:
-      TRACEPILOT_DATABASE_URL: postgresql://tracepilot:tracepilot@db:5432/tracepilot
-      TRACEPILOT_ENV: dev
+      TRACEPILOT_DATABASE_URL: postgresql://${POSTGRES_USER:-tracepilot}:${POSTGRES_PASSWORD:-tracepilot}@db:5432/${POSTGRES_DB:-tracepilot}
+      TRACEPILOT_ENV: ${TRACEPILOT_ENV:-dev}
+      TRACEPILOT_PORT: "8000"
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
     command: ["tracepilot-api"]
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: tracepilot-frontend
+    environment:
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   dbdata:
