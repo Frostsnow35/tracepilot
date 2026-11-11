@@ -12,6 +12,8 @@ Agent 运行时可观测平台：接入、存储、查看 Agent 运行时的执�
 | TimescaleDB hypertable 存储 | 已完成 |
 | Trace 查询 + 瀑布图可视化 | 已完成 |
 | 项目与 API Key 管理 | 已完成 |
+| 实时监控（统计概览、按 Agent 聚合、WebSocket 实时流） | 已完成 |
+| 分析看板（成功率、延迟趋势、成本拆解） | 已完成 |
 
 ## 技术栈
 
@@ -57,8 +59,8 @@ Agent(SDK) --> ingest(Axum) --> storage(PG+TimescaleDB)
 | storage | 数据层 | `backend/crates/api/src/modules/storage` | 已完成 |
 | query | 查询 | `backend/crates/api/src/modules/query` | 已完成 |
 | iam | 项目与 API Key | `backend/crates/api/src/modules/iam` | 已完成 |
-| monitor | 实时指标 | — | 规划中 |
-| analytics | 成功率 / 延迟 / 成本 | — | 规划中 |
+| monitor | 实时指标 | `backend/crates/api/src/modules/monitor` | 已完成 |
+| analytics | 成功率 / 延迟 / 成本 | `backend/crates/api/src/modules/analytics` | 已完成 |
 | recovery | 重试 / 回退观测 | — | 规划中 |
 | alert | 告警 | — | 规划中 |
 
@@ -72,9 +74,15 @@ Agent(SDK) --> ingest(Axum) --> storage(PG+TimescaleDB)
 | POST | `/api/ingest/traces` | 接入一条 trace 及其 spans |
 | GET | `/api/query/traces` | 列出 traces（`project_id`、`limit`） |
 | GET | `/api/query/traces/{id}` | trace 详情（含 spans） |
+| GET | `/api/monitor/stats` | 统计概览（`project_id`） |
+| GET | `/api/monitor/agents` | 按 Agent 聚合（`project_id`） |
+| GET | `/api/monitor/stream` | WebSocket 实时流（`project_id`、`api_key`） |
+| GET | `/api/analytics/summary` | 成功率 + 延迟分位 + span 类型（`project_id`） |
+| GET | `/api/analytics/latency` | 小时级延迟趋势（`project_id`） |
+| GET | `/api/analytics/cost` | 按 span 类型的成本拆解（`project_id`） |
 | GET | `/api/health` | 健康检查 |
 
-鉴权：除健康检查外，所有路由需要 `X-TracePilot-Key: <api_key>` 请求头。
+鉴权：除健康检查外，所有路由需要 `X-TracePilot-Key: <api_key>` 请求头。WebSocket 握手无法携带自定义 header，`api_key` 走 query 参数。
 
 ## 开发规范
 

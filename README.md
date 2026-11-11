@@ -16,6 +16,8 @@ TracePilot ingests OpenTelemetry-compatible traces from AI agents, stores them i
 | TimescaleDB hypertable storage | Done |
 | Trace query + waterfall visualization | Done |
 | Project + API key management | Done |
+| Realtime monitor (stat overview, per-agent stats, WebSocket live stream) | Done |
+| Analytics (success rate, latency trend, cost breakdown) | Done |
 
 ## Tech stack
 
@@ -61,8 +63,8 @@ See [docs/PLAN.md](docs/PLAN.md) for the full spec.
 | storage | data layer | `backend/crates/api/src/modules/storage` | Done |
 | query | trace lookup | `backend/crates/api/src/modules/query` | Done |
 | iam | projects + API keys | `backend/crates/api/src/modules/iam` | Done |
-| monitor | realtime metrics | — | Roadmap |
-| analytics | success / latency / cost | — | Roadmap |
+| monitor | realtime metrics | `backend/crates/api/src/modules/monitor` | Done |
+| analytics | success / latency / cost | `backend/crates/api/src/modules/analytics` | Done |
 | recovery | retry / fallback observation | — | Roadmap |
 | alert | alerting | — | Roadmap |
 
@@ -76,9 +78,15 @@ Modules are plugins: each implements the `Module` trait and registers one line i
 | POST | `/api/ingest/traces` | Ingest a trace + spans |
 | GET | `/api/query/traces` | List traces (`project_id`, `limit`) |
 | GET | `/api/query/traces/{id}` | Trace detail with spans |
+| GET | `/api/monitor/stats` | Stats overview (`project_id`) |
+| GET | `/api/monitor/agents` | Per-agent stats (`project_id`) |
+| GET | `/api/monitor/stream` | WebSocket live stream (`project_id`, `api_key`) |
+| GET | `/api/analytics/summary` | Success rate + latency percentiles + kind stats (`project_id`) |
+| GET | `/api/analytics/latency` | Hourly latency timeseries (`project_id`) |
+| GET | `/api/analytics/cost` | Cost breakdown by span kind (`project_id`) |
 | GET | `/api/health` | Health check |
 
-Auth: `X-TracePilot-Key: <api_key>` header on all non-health routes.
+Auth: `X-TracePilot-Key: <api_key>` header on all non-health routes. WebSocket auth goes through the `api_key` query param because browsers cannot set custom headers on WS handshakes.
 
 ## Development
 
