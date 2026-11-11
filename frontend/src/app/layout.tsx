@@ -17,6 +17,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               TracePilot
             </Link>
             <div className="flex gap-4 text-sm">
+              <Link href="/demo" className="text-blue-600 hover:underline">
+                演示
+              </Link>
               <Link href="/" className="text-blue-600 hover:underline">
                 Traces
               </Link>
