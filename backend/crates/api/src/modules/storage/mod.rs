@@ -82,20 +82,27 @@ impl Storage {
         .bind(trace_id)
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows.into_iter().map(|r| Span {
-            id: r.get("id"),
-            trace_id: r.get("trace_id"),
-            parent_span_id: r.get("parent_span_id"),
-            name: r.get("name"),
-            kind: r.get("kind"),
-            status: r.get("status"),
-            started_at: r.get("started_at"),
-            duration_ms: r.get("duration_ms"),
-            attributes: r.get("attributes"),
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| Span {
+                id: r.get("id"),
+                trace_id: r.get("trace_id"),
+                parent_span_id: r.get("parent_span_id"),
+                name: r.get("name"),
+                kind: r.get("kind"),
+                status: r.get("status"),
+                started_at: r.get("started_at"),
+                duration_ms: r.get("duration_ms"),
+                attributes: r.get("attributes"),
+            })
+            .collect())
     }
 
-    pub async fn list_traces(&self, project_id: &str, limit: i64) -> Result<Vec<Trace>, sqlx::Error> {
+    pub async fn list_traces(
+        &self,
+        project_id: &str,
+        limit: i64,
+    ) -> Result<Vec<Trace>, sqlx::Error> {
         let rows = sqlx::query(
             "SELECT id, project_id, agent_id, status, started_at, duration_ms
              FROM traces WHERE project_id = $1
@@ -105,14 +112,17 @@ impl Storage {
         .bind(limit)
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows.into_iter().map(|r| Trace {
-            id: r.get("id"),
-            project_id: r.get("project_id"),
-            agent_id: r.get("agent_id"),
-            status: r.get("status"),
-            started_at: r.get("started_at"),
-            duration_ms: r.get("duration_ms"),
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| Trace {
+                id: r.get("id"),
+                project_id: r.get("project_id"),
+                agent_id: r.get("agent_id"),
+                status: r.get("status"),
+                started_at: r.get("started_at"),
+                duration_ms: r.get("duration_ms"),
+            })
+            .collect())
     }
 }
 
