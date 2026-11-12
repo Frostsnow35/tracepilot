@@ -1,0 +1,40 @@
+site_name: TracePilot 开发者文档
+site_description: Agent 运行时可观测平台——开发指南、API 参考、部署与 SDK 接入
+site_author: TracePilot
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: 切换至深色模式
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: 切换至浅色模式
+
+nav:
+  - 首页: developer/index.md
+  - 架构: developer/architecture.md
+  - API 参考: developer/api.md
+  - SDK 接入: developer/sdk.md
+  - 部署: developer/deployment.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - tables
+  - toc:
+      permalink: true
